@@ -84,7 +84,7 @@ jobs:
         run: cp build/zephyr/zmk.uf2 sofle_right_nice_nano_v2.uf2
       
       - name: Archive (Sofle Right)
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: firmware
           path: sofle_right_nice_nano_v2.uf2
