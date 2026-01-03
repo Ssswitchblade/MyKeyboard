@@ -15,8 +15,10 @@ jobs:
       - name: Install Python dependencies
         run: |
           apt-get update
-          apt-get install -y python3-full python3-pip
-          pip3 install setuptools
+          apt-get install -y python3-full python3-venv
+          python3 -m venv /opt/zmk-venv
+          source /opt/zmk-venv/bin/activate
+          pip install setuptools
           
       - name: Cache west modules
         uses: actions/cache@v4
@@ -36,16 +38,24 @@ jobs:
             ${{ runner.os }}-
       
       - name: West Init
-        run: west init -l config
+        run: |
+          source /opt/zmk-venv/bin/activate
+          west init -l config
       
       - name: West Update
-        run: west update
+        run: |
+          source /opt/zmk-venv/bin/activate
+          west update
       
       - name: West Zephyr export
-        run: west zephyr-export
+        run: |
+          source /opt/zmk-venv/bin/activate
+          west zephyr-export
       
       - name: West Build (Sofle Left)
-        run: west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_left -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+        run: |
+          source /opt/zmk-venv/bin/activate
+          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_left -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
       
       - name: Sofle Left Kconfig file
         run: cat build/zephyr/.config | grep -v "^#" | grep -v "^$"
@@ -63,7 +73,9 @@ jobs:
         run: rm -rf build
       
       - name: West Build (Sofle Right)
-        run: west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_right -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+        run: |
+          source /opt/zmk-venv/bin/activate
+          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_right -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
       
       - name: Sofle Right Kconfig file
         run: cat build/zephyr/.config | grep -v "^#" | grep -v "^$"
@@ -72,7 +84,7 @@ jobs:
         run: cp build/zephyr/zmk.uf2 sofle_right_nice_nano_v2.uf2
       
       - name: Archive (Sofle Right)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
           name: firmware
           path: sofle_right_nice_nano_v2.uf2
