@@ -12,10 +12,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       
-      - name: Install distutils (Python 3.12 fix)
+      - name: Install Python dependencies
         run: |
           apt-get update
-          apt-get install -y python3-distutils
+          apt-get install -y python3-full python3-pip
+          pip3 install setuptools
           
       - name: Cache west modules
         uses: actions/cache@v4
