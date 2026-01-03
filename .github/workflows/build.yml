@@ -10,7 +10,7 @@ jobs:
     name: Build
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       
       - name: Install Python setuptools
         run: |
@@ -49,14 +49,8 @@ jobs:
       - name: Sofle Left Kconfig file
         run: cat build/zephyr/.config | grep -v "^#" | grep -v "^$"
       
-      - name: Rename zmk.uf2
+      - name: Rename zmk.uf2 (Left)
         run: cp build/zephyr/zmk.uf2 sofle_left_nice_nano_v2.uf2
-      
-      - name: Archive (Sofle Left)
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware
-          path: sofle_left_nice_nano_v2.uf2
       
       - name: Clean build directory
         run: rm -rf build
@@ -67,11 +61,17 @@ jobs:
       - name: Sofle Right Kconfig file
         run: cat build/zephyr/.config | grep -v "^#" | grep -v "^$"
       
-      - name: Rename zmk.uf2
+      - name: Rename zmk.uf2 (Right)
         run: cp build/zephyr/zmk.uf2 sofle_right_nice_nano_v2.uf2
       
-      - name: Archive (Sofle Right)
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware
-          path: sofle_right_nice_nano_v2.uf2
+- name: Archive Sofle Left
+  uses: actions/upload-artifact@v4
+  with:
+    name: sofle-left-firmware
+    path: sofle_left_nice_nano_v2.uf2
+
+- name: Archive Sofle Right
+  uses: actions/upload-artifact@v4
+  with:
+    name: sofle-right-firmware
+    path: sofle_right_nice_nano_v2.uf2
