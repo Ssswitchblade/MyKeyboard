@@ -43,6 +43,15 @@ jobs:
       - name: West Zephyr export
         run: west zephyr-export
       
+      - name: Validate Kconfig
+        run: |
+          echo "Checking sofle.conf for errors..."
+          if grep -q "ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL" config/sofle.conf; then
+            echo "Found deprecated ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL, replacing with ZMK_SPLIT_BLE_ROLE_CENTRAL..."
+            sed -i 's/ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL/ZMK_SPLIT_BLE_ROLE_CENTRAL/g' config/sofle.conf
+          fi
+          cat config/sofle.conf
+      
       - name: West Build (Sofle Left)
         run: west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_left -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
       
