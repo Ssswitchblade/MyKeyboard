@@ -11,6 +11,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
+      - name: Install Python distutils
+        run: |
+          apt-get update
+          apt-get install -y python3-distutils
+      
       - name: Create USB Config
         run: |
           # Очищаем старые конфиги
@@ -19,9 +24,6 @@ jobs:
           cat > config/sofle.conf << 'EOF'
           # USB Configuration for ZMK App
           CONFIG_ZMK_USB=y
-          CONFIG_USB_DEVICE_STACK=y
-          CONFIG_USB_DEVICE_VID=0xFEED
-          CONFIG_USB_DEVICE_PID=0x6060
           
           # BLE settings
           CONFIG_ZMK_BLE=y
