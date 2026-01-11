@@ -106,7 +106,7 @@ jobs:
         run: cp build/zephyr/zmk.uf2 sofle_right_ble_dfu.uf2
       
       - name: Upload BLE DFU Firmware
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sofle-ble-dfu-firmware
           path: |
