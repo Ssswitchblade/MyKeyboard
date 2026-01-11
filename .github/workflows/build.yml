@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: zmkfirmware/zmk-build-arm:latest
+      image: zmkfirmware/zmk-build-arm:stable  # Используем stable вместо latest
     name: Build BLE Keyboard with DFU
     steps:
       - name: Checkout
@@ -17,7 +17,6 @@ jobs:
           cat > config/sofle.conf << 'EOF'
           # BLE Configuration
           CONFIG_BT=y
-          CONFIG_BT_CTLR=y
           CONFIG_BT_PERIPHERAL=y
           CONFIG_BT_CENTRAL=y
           CONFIG_BT_MAX_CONN=5
@@ -28,15 +27,11 @@ jobs:
           CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
           CONFIG_ZMK_SPLIT=y
           
-          # BLE DFU (для прошивки через приложение ZMK)
-          CONFIG_BOOTLOADER_BOOTLOADER=n
+          # BLE DFU (упрощенная версия для stable)
           CONFIG_ZMK_BLE_DFU=y
           CONFIG_MCUMGR=y
           CONFIG_MCUMGR_CMD_IMG_MGMT=y
-          CONFIG_MCUMGR_CMD_OS_MGMT=y
           CONFIG_MCUMGR_SMP_BT=y
-          CONFIG_MCUMGR_SMP_BT_AUTHEN=n
-          CONFIG_MCUMGR_GRP_IMG_UPLOAD_CHECK_HOOK=n
           
           # Power settings
           CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
@@ -46,12 +41,6 @@ jobs:
           
           # Disable display
           CONFIG_ZMK_DISPLAY=n
-          CONFIG_LVGL=n
-          
-          # Memory settings for DFU
-          CONFIG_IMG_MANAGER=y
-          CONFIG_MCUBOOT_IMG_MANAGER=y
-          CONFIG_REBOOT=y
           EOF
           
           echo "=== BLE DFU Configuration ==="
