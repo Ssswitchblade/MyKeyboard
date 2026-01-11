@@ -17,9 +17,9 @@ jobs:
           apt-get update
           apt-get install -y python3-setuptools
           
-      - name: Ensure BLE configuration
+      - name: Create correct BLE configuration
         run: |
-          # Создаем или обновляем конфигурацию BLE
+          # Создаем правильную конфигурацию BLE
           cat > config/sofle.conf << 'EOF'
           # BLE Configuration
           CONFIG_ZMK_BLE=y
@@ -36,6 +36,7 @@ jobs:
           CONFIG_ZMK_BATTERY_REPORT_INTERVAL=60
           
           # Power Management
+          CONFIG_ZMK_IDLE_TIMEOUT=900000
           CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=900000
           CONFIG_ZMK_EXT_POWER=y
           
@@ -47,7 +48,7 @@ jobs:
           CONFIG_WS2812_STRIP=y
           EOF
           
-          echo "=== BLE Configuration ==="
+          echo "=== Correct BLE Configuration ==="
           cat config/sofle.conf
       
       - name: Cache west modules
@@ -80,8 +81,7 @@ jobs:
         run: |
           west build -s zmk/app -b nice_nano_v2 -- \
             -DSHIELD=sofle_left \
-            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" \
-            -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
+            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
       
       - name: Rename Left Firmware
         run: cp build/zephyr/zmk.uf2 sofle_left_ble_central.uf2
