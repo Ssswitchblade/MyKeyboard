@@ -1,4 +1,4 @@
-name: Build BLE Firmware
+name: Build BLE Firmware with DFU
 
 on: [push, pull_request, workflow_dispatch]
 
@@ -6,57 +6,59 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: zmkfirmware/zmk-build-arm:stable
-    name: Build BLE Keyboard
+      image: zmkfirmware/zmk-build-arm:latest
+    name: Build BLE Keyboard with DFU
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      
-      - name: Install Python setuptools
+        uses: actions/checkout@v3
+        
+      - name: Create BLE DFU configuration
         run: |
-          apt-get update
-          apt-get install -y python3-setuptools
-          
-      - name: Create BLE configuration with display
-        run: |
-          # Создаем конфигурацию с поддержкой дисплея
           cat > config/sofle.conf << 'EOF'
-          # Basic BLE Configuration
+          # BLE Configuration
+          CONFIG_BT=y
+          CONFIG_BT_CTLR=y
+          CONFIG_BT_PERIPHERAL=y
+          CONFIG_BT_CENTRAL=y
+          CONFIG_BT_MAX_CONN=5
+          CONFIG_BT_MAX_PAIRED=5
+          
+          # ZMK BLE Settings
           CONFIG_ZMK_BLE=y
           CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
           CONFIG_ZMK_SPLIT=y
+          
+          # BLE DFU (для прошивки через приложение ZMK)
+          CONFIG_BOOTLOADER_BOOTLOADER=n
+          CONFIG_ZMK_BLE_DFU=y
+          CONFIG_MCUMGR=y
+          CONFIG_MCUMGR_CMD_IMG_MGMT=y
+          CONFIG_MCUMGR_CMD_OS_MGMT=y
+          CONFIG_MCUMGR_SMP_BT=y
+          CONFIG_MCUMGR_SMP_BT_AUTHEN=n
+          CONFIG_MCUMGR_GRP_IMG_UPLOAD_CHECK_HOOK=n
+          
+          # Power settings
           CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
           
-          # Basic settings
+          # USB for flashing
           CONFIG_ZMK_USB=y
           
-          # Display configuration
-          CONFIG_ZMK_DISPLAY=y
-          CONFIG_ZMK_DISPLAY_STATUS_SCREEN_BUILT_IN=y
-          CONFIG_ZMK_WIDGET_BATTERY_STATUS=y
-          CONFIG_ZMK_WIDGET_OUTPUT_STATUS=y
-          CONFIG_ZMK_WIDGET_LAYER_STATUS=y
-          CONFIG_ZMK_WIDGET_WPM_STATUS=y
+          # Disable display
+          CONFIG_ZMK_DISPLAY=n
+          CONFIG_LVGL=n
           
-          # LVGL configuration
-          CONFIG_LVGL=y
-          CONFIG_LVGL_USE_LABEL=y
-          CONFIG_LVGL_USE_CONT=y
-          CONFIG_LVGL_HOR_RES=128
-          CONFIG_LVGL_VER_RES=32
-          CONFIG_LVGL_DPI=130
-          CONFIG_LVGL_BITS_PER_PIXEL=1
-          CONFIG_LVGL_DISPLAY_DEV_NAME="DISPLAY"
-          
-          # Disable ext_power to avoid errors
-          CONFIG_ZMK_EXT_POWER=n
+          # Memory settings for DFU
+          CONFIG_IMG_MANAGER=y
+          CONFIG_MCUBOOT_IMG_MANAGER=y
+          CONFIG_REBOOT=y
           EOF
           
-          echo "=== BLE Configuration with Display ==="
+          echo "=== BLE DFU Configuration ==="
           cat config/sofle.conf
       
       - name: Cache west modules
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         env:
           cache-name: cache-zephyr-modules
         with:
@@ -88,7 +90,7 @@ jobs:
             -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
       
       - name: Rename Left Firmware
-        run: cp build/zephyr/zmk.uf2 sofle_left_ble_central.uf2
+        run: cp build/zephyr/zmk.uf2 sofle_left_ble_dfu.uf2
       
       - name: Clean build
         run: rm -rf build
@@ -101,12 +103,12 @@ jobs:
             -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
       
       - name: Rename Right Firmware
-        run: cp build/zephyr/zmk.uf2 sofle_right_ble_peripheral.uf2
+        run: cp build/zephyr/zmk.uf2 sofle_right_ble_dfu.uf2
       
-      - name: Upload BLE Firmware
-        uses: actions/upload-artifact@v4
+      - name: Upload BLE DFU Firmware
+        uses: actions/upload-artifact@v3
         with:
-          name: sofle-ble-firmware-with-display
+          name: sofle-ble-dfu-firmware
           path: |
-            sofle_left_ble_central.uf2
-            sofle_right_ble_peripheral.uf2
+            sofle_left_ble_dfu.uf2
+            sofle_right_ble_dfu.uf2
