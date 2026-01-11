@@ -11,30 +11,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Install Python distutils
+      - name: Install Python setuptools (alternative to distutils)
         run: |
           apt-get update
-          apt-get install -y python3-distutils
+          apt-get install -y python3-setuptools python3-pip
+          pip3 install setuptools --break-system-packages
       
       - name: Create USB Config
         run: |
-          # Очищаем старые конфиги
           rm -f config/sofle.conf
-          
           cat > config/sofle.conf << 'EOF'
           # USB Configuration for ZMK App
           CONFIG_ZMK_USB=y
-          
-          # BLE settings
           CONFIG_ZMK_BLE=y
           CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
           CONFIG_ZMK_SPLIT=y
-          
-          # Power settings
           CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
           EOF
           
-          echo "=== USB Config for ZMK App ==="
+          echo "=== Config Content ==="
           cat config/sofle.conf
       
       - name: West Init
