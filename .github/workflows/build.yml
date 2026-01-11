@@ -1,4 +1,4 @@
-name: Build for ZMK App Flashing
+name: Build for ZMK USB Flashing
 
 on: [push, pull_request, workflow_dispatch]
 
@@ -11,21 +11,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Setup ZMK Config
+      - name: Create USB Config
         run: |
+          # Очищаем старые конфиги
+          rm -f config/sofle.conf
+          
           cat > config/sofle.conf << 'EOF'
+          # USB Configuration for ZMK App
+          CONFIG_ZMK_USB=y
+          CONFIG_USB_DEVICE_STACK=y
+          CONFIG_USB_DEVICE_VID=0xFEED
+          CONFIG_USB_DEVICE_PID=0x6060
+          
+          # BLE settings
           CONFIG_ZMK_BLE=y
           CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
           CONFIG_ZMK_SPLIT=y
-          CONFIG_ZMK_USB=y
+          
+          # Power settings
           CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
-          CONFIG_BT_MAX_CONN=2
-          CONFIG_BT_MAX_PAIRED=2
-          CONFIG_ZMK_BATTERY_REPORTING=y
-          CONFIG_ZMK_DISPLAY=n
           EOF
           
-          echo "=== ZMK App Configuration ==="
+          echo "=== USB Config for ZMK App ==="
           cat config/sofle.conf
       
       - name: West Init
@@ -37,21 +44,21 @@ jobs:
       - name: West Zephyr export
         run: west zephyr-export
       
-      - name: Build Left (Central)
+      - name: Build Left Side (Central)
         run: |
           west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_left -DZMK_CONFIG="$GITHUB_WORKSPACE/config"
-          cp build/zephyr/zmk.uf2 sofle_left_zmk_app.uf2
+          cp build/zephyr/zmk.uf2 sofle_left_usb.uf2
       
-      - name: Build Right (Peripheral)
+      - name: Build Right Side (Peripheral)
         run: |
           rm -rf build
           west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_right -DZMK_CONFIG="$GITHUB_WORKSPACE/config" -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
-          cp build/zephyr/zmk.uf2 sofle_right_zmk_app.uf2
+          cp build/zephyr/zmk.uf2 sofle_right_usb.uf2
       
       - name: Upload Firmware
         uses: actions/upload-artifact@v4
         with:
-          name: zmk-app-firmware
+          name: zmk-usb-firmware
           path: |
-            sofle_left_zmk_app.uf2
-            sofle_right_zmk_app.uf2
+            sofle_left_usb.uf2
+            sofle_right_usb.uf2
