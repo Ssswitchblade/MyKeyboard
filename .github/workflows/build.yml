@@ -1,35 +1,32 @@
-name: Build for ZMK USB Flashing
+name: Build Minimal USB Firmware
 
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04  # Используем Ubuntu 20.04 для совместимости
     container:
       image: zmkfirmware/zmk-build-arm:stable
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Install Python setuptools (alternative to distutils)
+      - name: Install Python distutils (работает на Ubuntu 20.04)
         run: |
           apt-get update
-          apt-get install -y python3-setuptools python3-pip
-          pip3 install setuptools --break-system-packages
+          apt-get install -y python3-distutils
       
-      - name: Create USB Config
+      - name: Create Minimal Config
         run: |
           rm -f config/sofle.conf
           cat > config/sofle.conf << 'EOF'
-          # USB Configuration for ZMK App
+          # Minimal configuration for USB flashing
           CONFIG_ZMK_USB=y
           CONFIG_ZMK_BLE=y
-          CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
           CONFIG_ZMK_SPLIT=y
-          CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
           EOF
           
-          echo "=== Config Content ==="
+          echo "=== Minimal Config ==="
           cat config/sofle.conf
       
       - name: West Init
@@ -41,21 +38,21 @@ jobs:
       - name: West Zephyr export
         run: west zephyr-export
       
-      - name: Build Left Side (Central)
+      - name: Build Left Side
         run: |
           west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_left -DZMK_CONFIG="$GITHUB_WORKSPACE/config"
-          cp build/zephyr/zmk.uf2 sofle_left_usb.uf2
+          cp build/zephyr/zmk.uf2 sofle_left.uf2
       
-      - name: Build Right Side (Peripheral)
+      - name: Build Right Side
         run: |
           rm -rf build
           west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_right -DZMK_CONFIG="$GITHUB_WORKSPACE/config" -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
-          cp build/zephyr/zmk.uf2 sofle_right_usb.uf2
+          cp build/zephyr/zmk.uf2 sofle_right.uf2
       
       - name: Upload Firmware
         uses: actions/upload-artifact@v4
         with:
-          name: zmk-usb-firmware
+          name: minimal-usb-firmware
           path: |
-            sofle_left_usb.uf2
-            sofle_right_usb.uf2
+            sofle_left.uf2
+            sofle_right.uf2
