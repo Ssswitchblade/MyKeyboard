@@ -1,4 +1,4 @@
-name: Build BLE Firmware with DFU
+name: Build for ZMK App Flashing
 
 on: [push, pull_request, workflow_dispatch]
 
@@ -6,62 +6,27 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: zmkfirmware/zmk-build-arm:stable  # Используем stable вместо latest
-    name: Build BLE Keyboard with DFU
+      image: zmkfirmware/zmk-build-arm:stable
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        
-      - name: Create BLE DFU configuration
+      
+      - name: Setup ZMK Config
         run: |
           cat > config/sofle.conf << 'EOF'
-          # BLE Configuration
-          CONFIG_BT=y
-          CONFIG_BT_PERIPHERAL=y
-          CONFIG_BT_CENTRAL=y
-          CONFIG_BT_MAX_CONN=5
-          CONFIG_BT_MAX_PAIRED=5
-          
-          # ZMK BLE Settings
           CONFIG_ZMK_BLE=y
           CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
           CONFIG_ZMK_SPLIT=y
-          
-          # BLE DFU (упрощенная версия для stable)
-          CONFIG_ZMK_BLE_DFU=y
-          CONFIG_MCUMGR=y
-          CONFIG_MCUMGR_CMD_IMG_MGMT=y
-          CONFIG_MCUMGR_SMP_BT=y
-          
-          # Power settings
-          CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
-          
-          # USB for flashing
           CONFIG_ZMK_USB=y
-          
-          # Disable display
+          CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
+          CONFIG_BT_MAX_CONN=2
+          CONFIG_BT_MAX_PAIRED=2
+          CONFIG_ZMK_BATTERY_REPORTING=y
           CONFIG_ZMK_DISPLAY=n
           EOF
           
-          echo "=== BLE DFU Configuration ==="
+          echo "=== ZMK App Configuration ==="
           cat config/sofle.conf
-      
-      - name: Cache west modules
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-zephyr-modules
-        with:
-          path: |
-            modules/
-            tools/
-            zephyr/
-            bootloader/
-            zmk/
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/west.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
       
       - name: West Init
         run: west init -l config
@@ -72,32 +37,21 @@ jobs:
       - name: West Zephyr export
         run: west zephyr-export
       
-      - name: Build Left Half (Central)
+      - name: Build Left (Central)
         run: |
-          west build -s zmk/app -b nice_nano_v2 -- \
-            -DSHIELD=sofle_left \
-            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_left -DZMK_CONFIG="$GITHUB_WORKSPACE/config"
+          cp build/zephyr/zmk.uf2 sofle_left_zmk_app.uf2
       
-      - name: Rename Left Firmware
-        run: cp build/zephyr/zmk.uf2 sofle_left_ble_dfu.uf2
-      
-      - name: Clean build
-        run: rm -rf build
-      
-      - name: Build Right Half (Peripheral)
+      - name: Build Right (Peripheral)
         run: |
-          west build -s zmk/app -b nice_nano_v2 -- \
-            -DSHIELD=sofle_right \
-            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" \
-            -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
+          rm -rf build
+          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_right -DZMK_CONFIG="$GITHUB_WORKSPACE/config" -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
+          cp build/zephyr/zmk.uf2 sofle_right_zmk_app.uf2
       
-      - name: Rename Right Firmware
-        run: cp build/zephyr/zmk.uf2 sofle_right_ble_dfu.uf2
-      
-      - name: Upload BLE DFU Firmware
+      - name: Upload Firmware
         uses: actions/upload-artifact@v4
         with:
-          name: sofle-ble-dfu-firmware
+          name: zmk-app-firmware
           path: |
-            sofle_left_ble_dfu.uf2
-            sofle_right_ble_dfu.uf2
+            sofle_left_zmk_app.uf2
+            sofle_right_zmk_app.uf2
