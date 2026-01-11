@@ -1,4 +1,4 @@
-name: Build
+name: Build BLE Firmware
 
 on: [push, pull_request, workflow_dispatch]
 
@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: zmkfirmware/zmk-build-arm:stable
-    name: Build
+    name: Build BLE Keyboard
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -17,8 +17,41 @@ jobs:
           apt-get update
           apt-get install -y python3-setuptools
           
+      - name: Ensure BLE configuration
+        run: |
+          # Создаем или обновляем конфигурацию BLE
+          cat > config/sofle.conf << 'EOF'
+          # BLE Configuration
+          CONFIG_ZMK_BLE=y
+          CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
+          CONFIG_BT_MAX_CONN=5
+          CONFIG_BT_MAX_PAIRED=5
+          
+          # Split Keyboard BLE Settings
+          CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
+          CONFIG_ZMK_SPLIT=y
+          
+          # Battery Monitoring
+          CONFIG_ZMK_BATTERY_REPORTING=y
+          CONFIG_ZMK_BATTERY_REPORT_INTERVAL=60
+          
+          # Power Management
+          CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=900000
+          CONFIG_ZMK_EXT_POWER=y
+          
+          # USB
+          CONFIG_ZMK_USB=y
+          
+          # RGB
+          CONFIG_ZMK_RGB_UNDERGLOW=y
+          CONFIG_WS2812_STRIP=y
+          EOF
+          
+          echo "=== BLE Configuration ==="
+          cat config/sofle.conf
+      
       - name: Cache west modules
-        uses: actions/cache@v4
+        uses: actions/cache@v2
         env:
           cache-name: cache-zephyr-modules
         with:
@@ -43,40 +76,33 @@ jobs:
       - name: West Zephyr export
         run: west zephyr-export
       
-      - name: Validate Kconfig
+      - name: Build Left Half (Central)
         run: |
-          echo "Checking sofle.conf for errors..."
-          if grep -q "ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL" config/sofle.conf; then
-            echo "Found deprecated ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL, replacing with ZMK_SPLIT_BLE_ROLE_CENTRAL..."
-            sed -i 's/ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL/ZMK_SPLIT_BLE_ROLE_CENTRAL/g' config/sofle.conf
-          fi
-          cat config/sofle.conf
+          west build -s zmk/app -b nice_nano_v2 -- \
+            -DSHIELD=sofle_left \
+            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" \
+            -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
       
-      - name: West Build (Sofle Left)
-        run: west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_left -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+      - name: Rename Left Firmware
+        run: cp build/zephyr/zmk.uf2 sofle_left_ble_central.uf2
       
-      - name: Sofle Left Kconfig file
-        run: cat build/zephyr/.config | grep -v "^#" | grep -v "^$"
-      
-      - name: Rename zmk.uf2 (Left)
-        run: cp build/zephyr/zmk.uf2 sofle_left_nice_nano_v2.uf2
-      
-      - name: Clean build directory
+      - name: Clean build
         run: rm -rf build
       
-      - name: West Build (Sofle Right)
-        run: west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_right -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+      - name: Build Right Half (Peripheral)
+        run: |
+          west build -s zmk/app -b nice_nano_v2 -- \
+            -DSHIELD=sofle_right \
+            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" \
+            -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
       
-      - name: Sofle Right Kconfig file
-        run: cat build/zephyr/.config | grep -v "^#" | grep -v "^$"
+      - name: Rename Right Firmware
+        run: cp build/zephyr/zmk.uf2 sofle_right_ble_peripheral.uf2
       
-      - name: Rename zmk.uf2 (Right)
-        run: cp build/zephyr/zmk.uf2 sofle_right_nice_nano_v2.uf2
-      
-      - name: Archive firmware
-        uses: actions/upload-artifact@v4
+      - name: Upload BLE Firmware
+        uses: actions/upload-artifact@v2
         with:
-          name: firmware
+          name: sofle-ble-firmware
           path: |
-            sofle_left_nice_nano_v2.uf2
-            sofle_right_nice_nano_v2.uf2
+            sofle_left_ble_central.uf2
+            sofle_right_ble_peripheral.uf2
