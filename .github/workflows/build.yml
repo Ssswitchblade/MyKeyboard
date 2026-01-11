@@ -51,7 +51,7 @@ jobs:
           cat config/sofle.conf
       
       - name: Cache west modules
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         env:
           cache-name: cache-zephyr-modules
         with:
@@ -100,7 +100,7 @@ jobs:
         run: cp build/zephyr/zmk.uf2 sofle_right_ble_peripheral.uf2
       
       - name: Upload BLE Firmware
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: sofle-ble-firmware
           path: |
