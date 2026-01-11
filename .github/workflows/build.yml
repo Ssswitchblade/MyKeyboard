@@ -17,9 +17,9 @@ jobs:
           apt-get update
           apt-get install -y python3-setuptools
           
-      - name: Create minimal BLE configuration
+      - name: Create BLE configuration with display
         run: |
-          # Создаем минимальную рабочую конфигурацию
+          # Создаем конфигурацию с поддержкой дисплея
           cat > config/sofle.conf << 'EOF'
           # Basic BLE Configuration
           CONFIG_ZMK_BLE=y
@@ -29,9 +29,30 @@ jobs:
           
           # Basic settings
           CONFIG_ZMK_USB=y
+          
+          # Display configuration
+          CONFIG_ZMK_DISPLAY=y
+          CONFIG_ZMK_DISPLAY_STATUS_SCREEN_BUILT_IN=y
+          CONFIG_ZMK_WIDGET_BATTERY_STATUS=y
+          CONFIG_ZMK_WIDGET_OUTPUT_STATUS=y
+          CONFIG_ZMK_WIDGET_LAYER_STATUS=y
+          CONFIG_ZMK_WIDGET_WPM_STATUS=y
+          
+          # LVGL configuration
+          CONFIG_LVGL=y
+          CONFIG_LVGL_USE_LABEL=y
+          CONFIG_LVGL_USE_CONT=y
+          CONFIG_LVGL_HOR_RES=128
+          CONFIG_LVGL_VER_RES=32
+          CONFIG_LVGL_DPI=130
+          CONFIG_LVGL_BITS_PER_PIXEL=1
+          CONFIG_LVGL_DISPLAY_DEV_NAME="DISPLAY"
+          
+          # Disable ext_power to avoid errors
+          CONFIG_ZMK_EXT_POWER=n
           EOF
           
-          echo "=== Minimal BLE Configuration ==="
+          echo "=== BLE Configuration with Display ==="
           cat config/sofle.conf
       
       - name: Cache west modules
@@ -85,7 +106,7 @@ jobs:
       - name: Upload BLE Firmware
         uses: actions/upload-artifact@v4
         with:
-          name: sofle-ble-firmware
+          name: sofle-ble-firmware-with-display
           path: |
             sofle_left_ble_central.uf2
             sofle_right_ble_peripheral.uf2
