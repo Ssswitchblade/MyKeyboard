@@ -1,115 +1,85 @@
-name: Build Sofle Keyboard Firmware
+name: Build
 
-on: 
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     container:
       image: zmkfirmware/zmk-build-arm:stable
-    
+    name: Build
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
-      with:
-        submodules: recursive
-    
-    - name: Install Python Dependencies
-      run: |
-        apt-get update
-        apt-get install -y python3-distutils
-        echo "✅ Python dependencies installed"
-    
-    - name: Create Minimal Configuration
-      run: |
-        echo "🧪 Creating configuration file..."
-        rm -f config/sofle.conf
-        cat > config/sofle.conf << 'EOF'
-        # Minimal configuration for Sofle Keyboard
-        CONFIG_ZMK_USB=y
-        CONFIG_ZMK_BLE=y
-        CONFIG_ZMK_SPLIT=y
-        EOF
-        
-        echo "📄 Configuration content:"
-        cat config/sofle.conf
-        echo "✅ Configuration created successfully"
-    
-    - name: Initialize West
-      run: |
-        echo "🚀 Initializing West..."
-        west init -l config
-        echo "✅ West initialized"
-    
-    - name: Update West Modules
-      run: |
-        echo "📥 Updating West modules..."
-        west update
-        echo "✅ West modules updated"
-    
-    - name: Export Zephyr Environment
-      run: |
-        echo "🔧 Exporting Zephyr environment..."
-        west zephyr-export
-        echo "✅ Zephyr environment exported"
-    
-    - name: Build Left Side (Central)
-      run: |
-        echo "🔨 Building left side (central)..."
-        west build -s zmk/app -b nice_nano_v2 -- \
-          -DSHIELD=sofle_left \
-          -DZMK_CONFIG="$GITHUB_WORKSPACE/config"
-        echo "✅ Left side built successfully"
-        
-        cp build/zephyr/zmk.uf2 sofle_left.uf2
-        echo "📁 Left firmware: sofle_left.uf2"
-        ls -la *.uf2
-    
-    - name: Build Right Side (Peripheral)
-      run: |
-        echo "🔨 Building right side (peripheral)..."
-        rm -rf build
-        west build -s zmk/app -b nice_nano_v2 -- \
-          -DSHIELD=sofle_right \
-          -DZMK_CONFIG="$GITHUB_WORKSPACE/config" \
-          -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
-        echo "✅ Right side built successfully"
-        
-        cp build/zephyr/zmk.uf2 sofle_right.uf2
-        echo "📁 Right firmware: sofle_right.uf2"
-        ls -la *.uf2
-    
-    - name: Upload Firmware Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: sofle-keyboard-firmware
-        path: |
-          sofle_left.uf2
-          sofle_right.uf2
-        retention-days: 30
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Show Download Instructions
-      run: |
-        echo "🎉 Build completed successfully!"
-        echo ""
-        echo "📥 DOWNLOAD INSTRUCTIONS:"
-        echo "1. Go to the 'Actions' tab in your repository"
-        echo "2. Click on the latest workflow run"
-        echo "3. Scroll down to the 'Artifacts' section"
-        echo "4. Click on 'sofle-keyboard-firmware' to download"
-        echo "5. Extract the ZIP file to get the .uf2 files"
-        echo ""
-        echo "🔧 FLASHING INSTRUCTIONS:"
-        echo "1. Connect RIGHT half via USB"
-        echo "2. Double-tap reset button to enter bootloader"
-        echo "3. Drag 'sofle_right.uf2' to the USB drive"
-        echo "4. Repeat for LEFT half with 'sofle_left.uf2'"
-        echo ""
-        echo "📱 ZMK APP: After flashing, use ZMK app to configure"
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Python setuptools
+        run: |
+          apt-get update
+          apt-get install -y python3-setuptools
+          
+      - name: Fix deprecated BLE setting
+        run: |
+          echo "Checking and fixing BLE configuration..."
+          if grep -q "ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL" config/sofle.conf; then
+            echo "Replacing deprecated ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL with ZMK_SPLIT_BLE_ROLE_CENTRAL"
+            sed -i 's/ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL/ZMK_SPLIT_BLE_ROLE_CENTRAL/g' config/sofle.conf
+          fi
+          
+          # Ensure USB is enabled for ZMK App
+          if ! grep -q "CONFIG_ZMK_USB=y" config/sofle.conf; then
+            echo "Adding USB support for ZMK App"
+            echo "CONFIG_ZMK_USB=y" >> config/sofle.conf
+          fi
+          
+          echo "=== Final configuration ==="
+          cat config/sofle.conf
+      
+      - name: Cache west modules
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-zephyr-modules
+        with:
+          path: |
+            modules/
+            tools/
+            zephyr/
+            bootloader/
+            zmk/
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/west.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      
+      - name: West Init
+        run: west init -l config
+      
+      - name: West Update
+        run: west update
+      
+      - name: West Zephyr export
+        run: west zephyr-export
+      
+      - name: Build Left Side (Central)
+        run: |
+          echo "Building left side (central role)..."
+          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_left -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+          cp build/zephyr/zmk.uf2 sofle_left.uf2
+          echo "✅ Left side built: sofle_left.uf2"
+      
+      - name: Build Right Side (Peripheral)
+        run: |
+          echo "Building right side (peripheral role)..."
+          rm -rf build
+          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_right -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
+          cp build/zephyr/zmk.uf2 sofle_right.uf2
+          echo "✅ Right side built: sofle_right.uf2"
+      
+      - name: Upload Firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: sofle-keyboard-firmware
+          path: |
+            sofle_left.uf2
+            sofle_right.uf2
+          retention-days: 30
