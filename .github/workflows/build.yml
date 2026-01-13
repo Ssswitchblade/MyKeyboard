@@ -17,21 +17,38 @@ jobs:
           apt-get update
           apt-get install -y python3-setuptools
           
-      - name: Fix deprecated BLE setting
+      - name: Create clean configuration
         run: |
-          echo "Checking and fixing BLE configuration..."
-          if grep -q "ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL" config/sofle.conf; then
-            echo "Replacing deprecated ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL with ZMK_SPLIT_BLE_ROLE_CENTRAL"
-            sed -i 's/ZMK_SPLIT_BLE_CENTRAL_PERIPHERAL/ZMK_SPLIT_BLE_ROLE_CENTRAL/g' config/sofle.conf
-          fi
+          echo "Creating clean configuration file..."
+          cat > config/sofle.conf << 'EOF'
+          # USB support for ZMK App flashing
+          CONFIG_ZMK_USB=y
           
-          # Ensure USB is enabled for ZMK App
-          if ! grep -q "CONFIG_ZMK_USB=y" config/sofle.conf; then
-            echo "Adding USB support for ZMK App"
-            echo "CONFIG_ZMK_USB=y" >> config/sofle.conf
-          fi
+          # BLE support
+          CONFIG_ZMK_BLE=y
+          CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
+          CONFIG_ZMK_SPLIT=y
           
-          echo "=== Final configuration ==="
+          # Display support
+          CONFIG_ZMK_DISPLAY=y
+          
+          # Encoder support
+          CONFIG_EC11=y
+          CONFIG_EC11_TRIGGER_GLOBAL_THREAD=y
+          
+          # RGB Underglow
+          CONFIG_ZMK_RGB_UNDERGLOW=y
+          CONFIG_ZMK_RGB_UNDERGLOW_EXT_POWER=n
+          
+          # Power management
+          CONFIG_ZMK_EXT_POWER_USB_ONLY=y
+          CONFIG_ZMK_RGB_UNDERGLOW_AUTO_OFF_IDLE=y
+          
+          # Basic BLE settings
+          CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
+          EOF
+          
+          echo "=== Configuration content ==="
           cat config/sofle.conf
       
       - name: Cache west modules
