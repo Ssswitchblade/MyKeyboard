@@ -17,7 +17,8 @@ jobs:
 
       - name: Initialize ZMK
         run: |
-          west init -m https://github.com/zmkfirmware/zmk.git
+          rm -rf .west
+          west init -m https://github.com/zmkfirmware/zmk.git --mf app/west.yml
           west update
           west zephyr-export
 
@@ -39,6 +40,7 @@ jobs:
         run: |
           cp build/left/zephyr/zmk.uf2 sofle_left.uf2
           cp build/right/zephyr/zmk.uf2 sofle_right.uf2
+          ls -lh *.uf2
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
