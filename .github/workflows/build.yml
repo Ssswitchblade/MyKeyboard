@@ -20,7 +20,7 @@ jobs:
           rm -rf .west
           west init -m https://github.com/zmkfirmware/zmk.git --mf app/west.yml
           west update
-          west zephyr-export
+          # west zephyr-export
 
       - name: Build Left
         run: |
