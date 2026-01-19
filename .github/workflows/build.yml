@@ -16,11 +16,27 @@ jobs:
         run: |
           apt-get update
           apt-get install -y python3-setuptools
-          
-      - name: Create clean configuration for left side
+      
+      - name: Create west.yml
         run: |
-          echo "Creating configuration for left side (central)..."
-          cat > config/sofle_left.conf << 'EOF'
+          cat > west.yml << 'EOF'
+          manifest:
+            remotes:
+              - name: zmk
+                url-base: https://github.com/zmkfirmware
+            projects:
+              - name: zmk
+                remote: zmk
+                revision: main
+                import: app/west.yml
+            self:
+              path: config
+          EOF
+      
+      - name: Create clean configuration
+        run: |
+          echo "Creating clean configuration file..."
+          cat > config/sofle.conf << 'EOF'
           # USB support for ZMK App flashing
           CONFIG_ZMK_USB=y
           
@@ -36,7 +52,7 @@ jobs:
           CONFIG_EC11=y
           CONFIG_EC11_TRIGGER_GLOBAL_THREAD=y
           
-          # RGB Underglow - Advanced effects
+          # RGB Underglow - Rainbow effect
           CONFIG_ZMK_RGB_UNDERGLOW=y
           CONFIG_WS2812_STRIP=y
           CONFIG_ZMK_RGB_UNDERGLOW_AUTO_OFF_IDLE=y
@@ -52,88 +68,22 @@ jobs:
           CONFIG_ZMK_SLEEP=y
           CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=1800000
           CONFIG_ZMK_IDLE_TIMEOUT=30000
-          CONFIG_ZMK_RGB_UNDERGLOW_AUTO_OFF_USB=n
           
           # Battery monitoring
-          CONFIG_ZMK_BATTERY_REPORTING=y
-          CONFIG_ZMK_BATTERY_REPORT_INTERVAL=60
-          CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_PROXY=y
           CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING=y
+          CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_PROXY=y
           
-          # BLE multi-profile - подключение к 4 устройствам
+          # BLE multi-profile
           CONFIG_BT_MAX_CONN=6
           CONFIG_BT_MAX_PAIRED=6
-          CONFIG_ZMK_BLE_PROFILE_COUNT=4
           CONFIG_ZMK_BLE_PASSKEY_ENTRY=n
           
           # Basic BLE settings
           CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
-          
-          # USB configuration
-          CONFIG_USB_DEVICE_VID=0xFEED
-          CONFIG_USB_DEVICE_PID=0x6060
-          CONFIG_USB_DEVICE_MANUFACTURER="ZMK"
-          CONFIG_USB_DEVICE_PRODUCT="Sofle"
           EOF
           
-          echo "=== Left side configuration ==="
-          cat config/sofle_left.conf
-      
-      - name: Create clean configuration for right side
-        run: |
-          echo "Creating configuration for right side (peripheral)..."
-          cat > config/sofle_right.conf << 'EOF'
-          # USB support for ZMK App flashing
-          CONFIG_ZMK_USB=y
-          
-          # BLE support
-          CONFIG_ZMK_BLE=y
-          CONFIG_ZMK_SPLIT=y
-          
-          # Display support
-          CONFIG_ZMK_DISPLAY=y
-          
-          # Encoder support
-          CONFIG_EC11=y
-          CONFIG_EC11_TRIGGER_GLOBAL_THREAD=y
-          
-          # RGB Underglow - Advanced effects
-          CONFIG_ZMK_RGB_UNDERGLOW=y
-          CONFIG_WS2812_STRIP=y
-          CONFIG_ZMK_RGB_UNDERGLOW_AUTO_OFF_IDLE=y
-          CONFIG_ZMK_RGB_UNDERGLOW_EFF_START=3
-          CONFIG_ZMK_RGB_UNDERGLOW_HUE_START=0
-          CONFIG_ZMK_RGB_UNDERGLOW_SAT_START=100
-          CONFIG_ZMK_RGB_UNDERGLOW_BRT_START=80
-          CONFIG_ZMK_RGB_UNDERGLOW_SPD_START=4
-          CONFIG_ZMK_RGB_UNDERGLOW_EXT_POWER=n
-          
-          # Power management
-          CONFIG_ZMK_SLEEP=y
-          CONFIG_ZMK_IDLE_SLEEP_TIMEOUT=1800000
-          CONFIG_ZMK_IDLE_TIMEOUT=30000
-          CONFIG_ZMK_RGB_UNDERGLOW_AUTO_OFF_USB=n
-          
-          # Battery monitoring
-          CONFIG_ZMK_BATTERY_REPORTING=y
-          CONFIG_ZMK_BATTERY_REPORT_INTERVAL=60
-          
-          # BLE settings for peripheral
-          CONFIG_BT_MAX_CONN=3
-          CONFIG_BT_MAX_PAIRED=3
-          
-          # Basic BLE settings
-          CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
-          
-          # USB configuration
-          CONFIG_USB_DEVICE_VID=0xFEED
-          CONFIG_USB_DEVICE_PID=0x6060
-          CONFIG_USB_DEVICE_MANUFACTURER="ZMK"
-          CONFIG_USB_DEVICE_PRODUCT="Sofle"
-          EOF
-          
-          echo "=== Right side configuration ==="
-          cat config/sofle_right.conf
+          echo "=== Configuration content ==="
+          cat config/sofle.conf
       
       - name: Cache west modules
         uses: actions/cache@v4
@@ -146,7 +96,7 @@ jobs:
             zephyr/
             bootloader/
             zmk/
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/west.yml') }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('west.yml') }}
           restore-keys: |
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
@@ -164,10 +114,10 @@ jobs:
       - name: Build Left Side (Central)
         run: |
           echo "Building left side (central role)..."
-          # Copy left config to default location
-          cp config/sofle_left.conf config/config.conf
-          
-          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_left -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
+          west build -s zmk/app -b nice_nano_v2 -- \
+            -DSHIELD=sofle_left \
+            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" \
+            -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
           cp build/zephyr/zmk.uf2 sofle_left.uf2
           echo "✅ Left side built: sofle_left.uf2"
       
@@ -175,11 +125,10 @@ jobs:
         run: |
           echo "Building right side (peripheral role)..."
           rm -rf build
-          
-          # Copy right config to default location
-          cp config/sofle_right.conf config/config.conf
-          
-          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=sofle_right -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
+          west build -s zmk/app -b nice_nano_v2 -- \
+            -DSHIELD=sofle_right \
+            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" \
+            -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
           cp build/zephyr/zmk.uf2 sofle_right.uf2
           echo "✅ Right side built: sofle_right.uf2"
       
