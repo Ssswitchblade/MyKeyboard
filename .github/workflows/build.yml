@@ -1,149 +1,48 @@
-name: Build
+name: Build ZMK Sofle
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
       image: zmkfirmware/zmk-build-arm:3.2
-    name: Build Sofle Keyboard
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Create ZMK configuration
+
+      - name: West init
         run: |
-          echo "Creating ZMK configuration files..."
-          
-          # Создаем базовый конфиг
-          mkdir -p config
-          cat > config/sofle.conf << 'EOF'
-          # USB support
-          CONFIG_ZMK_USB=y
-          
-          # BLE support
-          CONFIG_ZMK_BLE=y
-          CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
-          CONFIG_ZMK_SPLIT=y
-          
-          # Display support
-          CONFIG_ZMK_DISPLAY=y
-          
-          # Encoder support
-          CONFIG_EC11=y
-          CONFIG_EC11_TRIGGER_GLOBAL_THREAD=y
-          
-          # RGB Underglow
-          CONFIG_ZMK_RGB_UNDERGLOW=y
-          CONFIG_WS2812_STRIP=y
-          CONFIG_ZMK_RGB_UNDERGLOW_EXT_POWER=n
-          CONFIG_ZMK_RGB_UNDERGLOW_AUTO_OFF_IDLE=y
-          
-          # Power management
-          CONFIG_ZMK_SLEEP=y
-          
-          # BLE multiple devices
-          CONFIG_BT_MAX_CONN=6
-          CONFIG_BT_MAX_PAIRED=6
-          
-          # Basic BLE settings
-          CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
-          EOF
-          
-          echo "Configuration created successfully"
-          ls -la config/
-      
-      - name: Initialize ZMK
-        run: |
-          # Инициализируем ZMK с минимальными требованиями
-          if [ ! -d "zmk" ]; then
-            west init -l config
-          fi
-      
-      - name: Update ZMK modules
-        run: |
+          west init -l config
           west update
-      
-      - name: Export Zephyr environment
-        run: |
           west zephyr-export
-      
-      - name: Build Left Side (Central)
+
+      - name: Build firmware (build.yaml)
         run: |
-          echo "Building left side (central role)..."
-          
-          # Создаем временный конфиг без проблемных опций
-          cat > /tmp/sofle_left.conf << 'EOF'
-          CONFIG_ZMK_USB=y
-          CONFIG_ZMK_BLE=y
-          CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=y
-          CONFIG_ZMK_SPLIT=y
-          CONFIG_ZMK_DISPLAY=y
-          CONFIG_EC11=y
-          CONFIG_EC11_TRIGGER_GLOBAL_THREAD=y
-          CONFIG_ZMK_RGB_UNDERGLOW=y
-          CONFIG_WS2812_STRIP=y
-          CONFIG_ZMK_RGB_UNDERGLOW_EXT_POWER=n
-          CONFIG_ZMK_SLEEP=y
-          CONFIG_BT_MAX_CONN=6
-          CONFIG_BT_MAX_PAIRED=6
-          CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
-          EOF
-          
-          # Копируем конфиг
-          cp /tmp/sofle_left.conf config/config.conf
-          
-          # Сборка левой половины
-          west build -s zmk/app -b nice_nano_v2 -- \
-            -DSHIELD=sofle_left \
-            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
-          
-          # Копируем прошивку
-          cp build/zephyr/zmk.uf2 sofle_left.uf2
-          echo "✅ Left side built: sofle_left.uf2"
-          ls -lh sofle_left.uf2
-      
-      - name: Build Right Side (Peripheral)
+          west build -s zmk/app -d build/left \
+            -b promicro_nrf52840 \
+            -- -DSHIELD=sofle_left \
+               -DZMK_CONFIG=${GITHUB_WORKSPACE}/config
+
+          west build -s zmk/app -d build/right \
+            -b promicro_nrf52840 \
+            -- -DSHIELD=sofle_right \
+               -DZMK_CONFIG=${GITHUB_WORKSPACE}/config
+
+      - name: Collect UF2
         run: |
-          echo "Building right side (peripheral role)..."
-          rm -rf build
-          
-          # Создаем временный конфиг для правой половины
-          cat > /tmp/sofle_right.conf << 'EOF'
-          CONFIG_ZMK_USB=y
-          CONFIG_ZMK_BLE=y
-          CONFIG_ZMK_SPLIT=y
-          CONFIG_ZMK_DISPLAY=y
-          CONFIG_EC11=y
-          CONFIG_EC11_TRIGGER_GLOBAL_THREAD=y
-          CONFIG_ZMK_RGB_UNDERGLOW=y
-          CONFIG_WS2812_STRIP=y
-          CONFIG_ZMK_RGB_UNDERGLOW_EXT_POWER=n
-          CONFIG_ZMK_SLEEP=y
-          CONFIG_BT_MAX_CONN=6
-          CONFIG_BT_MAX_PAIRED=6
-          CONFIG_BT_CTLR_TX_PWR_PLUS_8=y
-          EOF
-          
-          # Копируем конфиг
-          cp /tmp/sofle_right.conf config/config.conf
-          
-          # Сборка правой половины
-          west build -s zmk/app -b nice_nano_v2 -- \
-            -DSHIELD=sofle_right \
-            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config" \
-            -DCONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL=n
-          
-          # Копируем прошивку
-          cp build/zephyr/zmk.uf2 sofle_right.uf2
-          echo "✅ Right side built: sofle_right.uf2"
-          ls -lh sofle_right.uf2
-      
-      - name: Upload Firmware
+          cp build/left/zephyr/zmk.uf2 sofle_left.uf2
+          cp build/right/zephyr/zmk.uf2 sofle_right.uf2
+          ls -lh *.uf2
+
+      - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: sofle-keyboard-firmware
+          name: sofle-zmk-firmware
           path: |
             sofle_left.uf2
             sofle_right.uf2
